@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>TipSplit Pro - מחשבון טיפים לבר</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- XLSX (SheetJS) for Excel import/export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a2f;
+      --text:#eaf0ff;
+      --muted:#a9b7da;
+      --line:rgba(255,255,255,.10);
+      --accent:#7c5cff;
+      --accent2:#22c55e;
+      --danger:#ef4444;
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --radius:18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans Hebrew", "Heebo", sans-serif;
+      background:
+        radial-gradient(1100px 700px at 10% -10%, rgba(124,92,255,.35), transparent 55%),
+        radial-gradient(900px 600px at 95% 10%, rgba(34,197,94,.22), transparent 50%),
+        radial-gradient(700px 450px at 50% 110%, rgba(59,130,246,.18), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      padding:16px;
+    }
+
+    .app{
+      max-width: 980px;
+      margin: 0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size: clamp(20px, 3.8vw, 30px);
+      letter-spacing:.2px;
+      line-height:1.15;
+    }
+
+    .brand p{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .cardHead{
+      padding:14px 14px 10px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .cardHead .title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .cardHead .title b{
+      font-size:15px;
+    }
+    .cardHead .title span{
+      color:var(--muted);
+      font-size:12.5px;
+    }
+
+    .cardBody{ padding:14px; }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:10px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+
+    label{
+      color:var(--muted);
+      font-size:12.5px;
+    }
+
+    input, button{ font:inherit; }
+
+    input{
+      width:100%;
+      padding:11px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,16,30,.55);
+      color:var(--text);
+      outline:none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    input::placeholder{ color: rgba(233,240,255,.45); }
+    input:focus{
+      border-color: rgba(124,92,255,.7);
+      box-shadow: 0 0 0 3px rgba(124,92,255,.18);
+    }
+
+    /* Arrival turns red if gap > 60 minutes */
+    .arrivalLate{
+      border-color: rgba(239,68,68,.85) !important;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.18) !important;
+    }
+
+    /* Per-employee min override highlight */
+    .minManual{
+      border-color: rgba(124,92,255,.75) !important;
+      box-shadow: 0 0 0 3px rgba(124,92,255,.18) !important;
+    }
+
+    .btnRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .btn{
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      cursor:pointer;
+      transition: transform .05s ease, background .15s ease, border-color .15s ease;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      white-space:nowrap;
+      user-select:none;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn:hover{ background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.20); }
+
+    .btn.primary{
+      background: rgba(124,92,255,.20);
+      border-color: rgba(124,92,255,.45);
+    }
+    .btn.primary:hover{
+      background: rgba(124,92,255,.26);
+      border-color: rgba(124,92,255,.62);
+    }
+
+    .btn.good{
+      background: rgba(34,197,94,.16);
+      border-color: rgba(34,197,94,.42);
+    }
+
+    .btn.danger{
+      background: rgba(239,68,68,.14);
+      border-color: rgba(239,68,68,.42);
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font-size:12.5px;
+    }
+
+    .tableWrap{
+      overflow:auto;
+      border-radius: 16px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.12);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      min-width: 1520px;
+    }
+
+    thead th{
+      position:sticky;
+      top:0;
+      background: rgba(15,26,47,.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+      padding:10px;
+      text-align:right;
+      color: var(--muted);
+      font-size:12.5px;
+      font-weight:600;
+      white-space:nowrap;
+    }
+
+    tbody td{
+      border-top:1px solid rgba(255,255,255,.06);
+      padding:10px;
+      vertical-align:top;
+    }
+
+    tbody tr:hover{ background: rgba(255,255,255,.03); }
+
+    .rowControls{
+      display:flex;
+      gap:8px;
+      justify-content:flex-start;
+    }
+
+    .mini{
+      padding:8px 10px;
+      border-radius: 10px;
+      font-size:13px;
+    }
+
+    .num{ font-variant-numeric: tabular-nums; }
+
+    .status{
+      margin-top:10px;
+      color: var(--muted);
+      font-size:12.5px;
+      line-height:1.35;
+    }
+
+    .fileInput{ display:none; }
+
+    @media (max-width: 780px){
+      .cardHead{ align-items:flex-start; }
+      .btnRow{ justify-content:stretch; }
+      .btnRow .btn{ flex:1; justify-content:center; }
+    }
+
+    .inlineSummary{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:8px 10px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      font-size:12.5px;
+      line-height:1;
+      flex-wrap:wrap;
+    }
+    .inlineSummary b{
+      color: var(--text);
+      font-weight:700;
+    }
+    .inlineSummary .dot{
+      opacity:.55;
+    }
+
+    .cellInput{
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="brand">
+        <h1>TipSplit Pro</h1>
+        <p>חלוקת טיפים מדויקת באגורות: קודם מינימום אישי מתוך הטיפים, ואם לא מספיק – המעסיק משלים. אם יש עודף – מחולק לפי שעות.</p>
+      </div>
+      <div class="pill" id="todayPill">תאריך: <span class="num" id="todayText"></span></div>
+    </div>
+
+    <div class="card">
+      <div class="cardHead">
+        <div class="title">
+          <b>הגדרות כלליות</b>
+          <span>הזן סה״כ טיפים. הזן שכר מינימום לשעה (ברירת מחדל). לכל עובד אפשר להזין מינימום אישי (אופציונלי).</span>
+        </div>
+        <div class="btnRow">
+          <button class="btn primary" id="installBtn" style="display:none;">⬇️ התקן אפליקציה</button>
+          <button class="btn primary" id="addRowBtn">+ הוסף עובד</button>
+          <button class="btn good" id="exportBtn">ייצוא לאקסל</button>
+          <button class="btn" id="importBtn">ייבוא מאקסל</button>
+          <input class="fileInput" id="filePicker" type="file" accept=".xlsx,.xls" />
+        </div>
+      </div>
+
+      <div class="cardBody">
+        <div class="grid">
+          <div class="field" style="grid-column: span 12;">
+            <label>סה״כ טיפים כולל (מספר)</label>
+            <input id="totalTips" inputmode="decimal" placeholder="לדוגמה: 1250" />
+          </div>
+
+          <div class="field" style="grid-column: span 12;">
+            <label>מינימום לשעה (ברירת מחדל) - אופציונלי</label>
+            <input id="minPerHour" inputmode="numeric" placeholder="לדוגמה: 100" />
+          </div>
+
+          <div class="inlineSummary" style="grid-column: span 12;">
+            <span>סה״כ שעות: <b class="num" id="sumHours">0.00</b></span>
+            <span class="dot">•</span>
+            <span>טיפים לשעה (נומינלי): <b class="num" id="tipsPerHourNominal">0.00</b></span>
+            <span class="dot">•</span>
+            <span>השלמת מעסיק (סה״כ): <b class="num" id="sumEmployerTopup">0.00</b></span>
+          </div>
+        </div>
+
+        <div class="status" id="statusText"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardHead">
+        <div class="title">
+          <b>עובדים</b>
+          <span>אלגוריתם: אם הטיפים מספיקים לכל המינימומים האישיים – נותנים מינימום לכל אחד, והעודף מתחלק לפי שעות. אם לא מספיק – הטיפים מתחלקים פרופורציונלית למינימום הנדרש, והמעסיק משלים את החסר.</span>
+        </div>
+      </div>
+
+      <div class="cardBody">
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px;">תאריך</th>
+                <th style="width:140px;">שם פרטי</th>
+                <th style="width:160px;">שם משפחה</th>
+                <th style="width:140px;">שעת הגעה</th>
+                <th style="width:140px;">עליה למשמרת</th>
+                <th style="width:140px;">ירידה ממשמרת</th>
+                <th style="width:120px;">מינימום לשעה</th>
+                <th style="width:110px;">סה״כ שעות</th>
+                <th style="width:150px;">מינימום לשכר</th>
+                <th style="width:160px;">טיפים מהקופה</th>
+                <th style="width:150px;">השלמת מעסיק</th>
+                <th style="width:170px;">סה״כ שכר</th>
+                <th style="width:120px;">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <div class="status">
+          הערה: אם הירידה מוקדמת מהעליה, המערכת מניחה שהמשמרת עברה חצות (למשל 22:00 → 03:00).<br>
+          הערה כספית: כל החישובים מתבצעים באגורות, והעיגול מבוצע כך שסכום הטיפים המחולק תמיד שווה בדיוק לסה״כ הטיפים שהוזן.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const state = { rows: [] };
+
+    function isoToday() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function setToday() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      el('todayText').textContent = `${dd}.${mm}.${yyyy}`;
+    }
+
+    function escapeHtml(s){
+      return String(s ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#039;');
+    }
+
+    function parseNumber(v) {
+      if (v == null) return 0;
+      const s = String(v).trim().replace(/,/g,'');
+      if (!s) return 0;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function parseNumberOrNull(v) {
+      if (v == null) return null;
+      const s = String(v).trim().replace(/,/g,'');
+      if (!s) return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    // --- Integer-only helpers for per-employee override ---
+    function digitsOnly(raw) {
+      return String(raw ?? '').replace(/[^\d]/g, '');
+    }
+
+    function parseIntOrNull(v) {
+      if (v == null) return null;
+      const s = digitsOnly(String(v).trim());
+      if (!s) return null;
+      const n = Number(s);
+      return Number.isInteger(n) ? n : null;
+    }
+
+    function fmt2(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return '0.00';
+      return x.toFixed(2);
+    }
+
+    function moneyToCents(n){
+      const x = Number(n);
+      if (!Number.isFinite(x)) return 0;
+      return Math.max(0, Math.round(x * 100));
+    }
+    function centsToMoney(c){
+      const x = Number(c);
+      if (!Number.isFinite(x)) return 0;
+      return x / 100;
+    }
+
+    function autoColonWhileTyping(raw) {
+      const digits = String(raw ?? '').replace(/\D/g, '').slice(0, 4);
+      if (digits.length <= 2) return digits;
+      return digits.slice(0, digits.length - 2) + ':' + digits.slice(-2);
+    }
+
+    function normalizeOnBlurToHHMM(raw) {
+      let s = String(raw ?? '').trim();
+      if (!s) return '';
+      if (/^\d+$/.test(s)) s = autoColonWhileTyping(s);
+      const m = s.match(/^(\d{1,2}):(\d{1,2})$/);
+      if (!m) return '';
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (!Number.isInteger(hh) || !Number.isInteger(mm)) return '';
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+      return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+    }
+
+    function timeToMinutes(t) {
+      if (!t) return null;
+      const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (!Number.isInteger(hh) || !Number.isInteger(mm)) return null;
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return hh*60 + mm;
+    }
+
+    function calcDurationMinutes(startHHMM, endHHMM) {
+      const a = timeToMinutes(startHHMM);
+      const b = timeToMinutes(endHHMM);
+      if (a == null || b == null) return 0;
+      let diff = b - a;
+      if (diff < 0) diff += 24*60;
+      return diff;
+    }
+
+    function calcDurationHours(startHHMM, endHHMM) {
+      return calcDurationMinutes(startHHMM, endHHMM) / 60;
+    }
+
+    // Minutes forward from "from" to "to" (supports crossing midnight)
+    function forwardMinutesDiff(fromHHMM, toHHMM) {
+      const a = timeToMinutes(fromHHMM);
+      const b = timeToMinutes(toHHMM);
+      if (a == null || b == null) return null;
+      let diff = b - a;
+      if (diff < 0) diff += 24*60;
+      return diff;
+    }
+
+    function addRow(data = {}) {
+      const row = {
+        id: crypto.randomUUID(),
+        date: data.date || isoToday(),
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        arrival: data.arrival || '',
+        shiftStart: data.shiftStart || '',
+        shiftEnd: data.shiftEnd || '',
+        minPerHourOverride: (data.minPerHourOverride ?? null) // null => use global
+      };
+      state.rows.push(row);
+      renderRows();
+      recalc();
+    }
+
+    function removeRow(id) {
+      state.rows = state.rows.filter(r => r.id !== id);
+      renderRows();
+      recalc();
+    }
+
+    function updateRow(id, key, value) {
+      const r = state.rows.find(x => x.id === id);
+      if (!r) return;
+      r[key] = value;
+      recalc();
+    }
+
+    function largestRemainderAllocate(totalCents, weights){
+      // weights: array of non-negative integers
+      const sumW = weights.reduce((a,b)=>a+b,0);
+      const n = weights.length;
+      const alloc = new Array(n).fill(0);
+
+      if (n === 0) return alloc;
+      if (totalCents <= 0) return alloc;
+      if (sumW <= 0) {
+        // if no weights, split equally by remainder method
+        const base = Math.floor(totalCents / n);
+        let rem = totalCents - base*n;
+        for (let i=0;i<n;i++) alloc[i] = base;
+        for (let i=0;i<rem;i++) alloc[i] += 1;
+        return alloc;
+      }
+
+      const parts = [];
+      let used = 0;
+      for (let i=0;i<n;i++){
+        const exactNum = totalCents * weights[i]; // integer
+        const base = Math.floor(exactNum / sumW);
+        const rem = exactNum - base*sumW; // remainder in [0, sumW)
+        alloc[i] = base;
+        used += base;
+        parts.push({ i, rem });
+      }
+
+      let left = totalCents - used;
+      parts.sort((a,b)=>b.rem - a.rem);
+
+      for (let k=0; k<left; k++){
+        alloc[parts[k % parts.length].i] += 1;
+      }
+      return alloc;
+    }
+
+    function computeAndAllocate(){
+      const totalTipsMoney = parseNumber(el('totalTips').value);
+      const totalTipsCents = moneyToCents(totalTipsMoney);
+
+      const globalMinMoney = parseNumber(el('minPerHour').value);
+      const globalRateCentsPerHour = moneyToCents(globalMinMoney); // rate cents/hour
+
+      // Build per-row computed base data
+      const rowsData = state.rows.map((r) => {
+        const minutes = calcDurationMinutes(r.shiftStart, r.shiftEnd);
+
+        const overrideMoney = (r.minPerHourOverride == null) ? null : Math.max(0, Number(r.minPerHourOverride));
+        const rateCentsPerHour = (overrideMoney == null) ? globalRateCentsPerHour : moneyToCents(overrideMoney);
+
+        // Minimum total in cents = ceil(minutes * rate / 60)
+        const minNumer = minutes * rateCentsPerHour;
+        const minTotalCents = (minutes > 0 && rateCentsPerHour > 0) ? Math.ceil(minNumer / 60) : 0;
+
+        return {
+          id: r.id,
+          minutes,
+          hours: minutes / 60,
+          rateCentsPerHour,
+          minTotalCents,
+          minWeightNumer: minNumer
+        };
+      });
+
+      const totalMinutes = rowsData.reduce((a,x)=>a + x.minutes, 0);
+      const sumMinCents = rowsData.reduce((a,x)=>a + x.minTotalCents, 0);
+
+      // Allocation outputs
+      const tipsAllocCents = new Array(rowsData.length).fill(0);
+      const employerTopupCents = new Array(rowsData.length).fill(0);
+
+      if (rowsData.length === 0 || totalTipsCents <= 0) {
+        for (let i=0;i<rowsData.length;i++){
+          employerTopupCents[i] = rowsData[i].minTotalCents;
+        }
+      } else if (totalTipsCents >= sumMinCents) {
+        // Case A: enough tips to cover all minima
+        for (let i=0;i<rowsData.length;i++){
+          tipsAllocCents[i] = rowsData[i].minTotalCents;
+        }
+        const remaining = totalTipsCents - sumMinCents;
+
+        if (remaining > 0) {
+          const weights = rowsData.map(x => x.minutes);
+          const extra = largestRemainderAllocate(remaining, weights);
+          for (let i=0;i<rowsData.length;i++){
+            tipsAllocCents[i] += extra[i];
+          }
+        }
+
+        for (let i=0;i<rowsData.length;i++){
+          employerTopupCents[i] = 0;
+        }
+      } else {
+        // Case B: not enough tips -> distribute tips proportionally to required minima
+        let weights = rowsData.map(x => x.minTotalCents);
+        const sumW = weights.reduce((a,b)=>a+b,0);
+        if (sumW <= 0) weights = rowsData.map(x => x.minutes);
+
+        const alloc = largestRemainderAllocate(totalTipsCents, weights);
+        for (let i=0;i<rowsData.length;i++){
+          tipsAllocCents[i] = alloc[i];
+          employerTopupCents[i] = Math.max(0, rowsData[i].minTotalCents - tipsAllocCents[i]);
+        }
+      }
+
+      return {
+        totalTipsCents,
+        globalRateCentsPerHour,
+        totalMinutes,
+        totalHours: totalMinutes / 60,
+        sumMinCents,
+        tipsAllocCents,
+        employerTopupCents,
+        rowsData
+      };
+    }
+
+    function recalc() {
+      const totalTips = parseNumber(el('totalTips').value);
+      const globalMin = parseNumber(el('minPerHour').value);
+
+      const issues = [];
+      if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
+      if (totalTips < 0) issues.push('סה״כ טיפים לא יכול להיות שלילי.');
+      if (globalMin < 0) issues.push('מינימום לשעה לא יכול להיות שלילי.');
+
+      for (let i=0;i<state.rows.length;i++){
+        const r = state.rows[i];
+        if (!r.date) issues.push(`שורת עובד ${i+1}: חסר תאריך.`);
+        if (r.shiftStart && timeToMinutes(r.shiftStart) == null) issues.push(`שורת עובד ${i+1}: "עליה למשמרת" בפורמט לא תקין (HH:MM).`);
+        if (r.shiftEnd && timeToMinutes(r.shiftEnd) == null) issues.push(`שורת עובד ${i+1}: "ירידה ממשמרת" בפורמט לא תקין (HH:MM).`);
+        if (r.arrival && timeToMinutes(r.arrival) == null) issues.push(`שורת עובד ${i+1}: "שעת הגעה" בפורמט לא תקין (HH:MM).`);
+        if (r.minPerHourOverride != null && (!Number.isFinite(Number(r.minPerHourOverride)) || Number(r.minPerHourOverride) < 0)) {
+          issues.push(`שורת עובד ${i+1}: "מינימום לשעה" אישי לא תקין (חייב להיות מספר >= 0).`);
+        }
+      }
+
+      const alloc = computeAndAllocate();
+
+      const sumHoursEl = el('sumHours');
+      const tipsPerHourNominalEl = el('tipsPerHourNominal');
+      const sumEmployerTopupEl = el('sumEmployerTopup');
+
+      const totalHours = alloc.totalHours || 0;
+      const tipsPerHourNominal = (totalHours > 0) ? (centsToMoney(alloc.totalTipsCents) / totalHours) : 0;
+
+      if (sumHoursEl) sumHoursEl.textContent = fmt2(totalHours);
+      if (tipsPerHourNominalEl) tipsPerHourNominalEl.textContent = fmt2(tipsPerHourNominal);
+
+      const topupSum = alloc.employerTopupCents.reduce((a,b)=>a+b,0);
+      if (sumEmployerTopupEl) sumEmployerTopupEl.textContent = fmt2(centsToMoney(topupSum));
+
+      el('statusText').textContent =
+        issues.length === 0
+          ? (
+              alloc.totalTipsCents >= alloc.sumMinCents
+                ? 'מצב: יש מספיק טיפים כדי לכסות את כל המינימומים האישיים. קודם מינימום לכל עובד, והעודף מתחלק לפי שעות.'
+                : 'מצב: אין מספיק טיפים כדי לכסות את כל המינימומים האישיים. הטיפים מתחלקים פרופורציונלית למינימום הנדרש, והמעסיק משלים את החסר.'
+            )
+          : issues.join(' ');
+
+      const tbody = el('rows');
+      for (const tr of tbody.querySelectorAll('tr[data-id]')) {
+        const id = tr.getAttribute('data-id');
+        const idx = state.rows.findIndex(x => x.id === id);
+        if (idx < 0) continue;
+
+        const r = state.rows[idx];
+        const rd = alloc.rowsData[idx];
+
+        const tipsC = alloc.tipsAllocCents[idx] || 0;
+        const topupC = alloc.employerTopupCents[idx] || 0;
+        const totalPayC = tipsC + topupC;
+
+        tr.querySelector('[data-col="hours"]').textContent = fmt2(rd.hours);
+        tr.querySelector('[data-col="minTotal"]').textContent = fmt2(centsToMoney(rd.minTotalCents));
+        tr.querySelector('[data-col="tipsFromPool"]').textContent = fmt2(centsToMoney(tipsC));
+        tr.querySelector('[data-col="employerTopup"]').textContent = fmt2(centsToMoney(topupC));
+        tr.querySelector('[data-col="totalPay"]').textContent = fmt2(centsToMoney(totalPayC));
+
+        // Per-row min input UI (integer display)
+        const minInput = tr.querySelector('input[data-role="minPerHour"]');
+        if (minInput) {
+          const isManual = (r.minPerHourOverride != null && String(r.minPerHourOverride).trim() !== '');
+
+          // אם אין override אישי, נציג את ברירת המחדל בשדה (לנראות) כמספר שלם
+          if (!isManual) {
+            const globalMinMoney = parseNumber(el('minPerHour').value);
+            minInput.value = (globalMinMoney > 0) ? String(Math.round(globalMinMoney)) : '';
+          } else {
+            minInput.value = String(Math.max(0, Math.round(Number(r.minPerHourOverride))));
+          }
+
+          minInput.classList.toggle('minManual', isManual);
+          minInput.placeholder = 'ברירת מחדל';
+        }
+
+        // Arrival red if gap (Arrival -> Shift Start) > 60 minutes
+        const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
+        const arrivalInput = tr.querySelector('input[data-role="arrival"]');
+        if (arrivalInput) {
+          const late = (gap != null && gap > 60);
+          arrivalInput.classList.toggle('arrivalLate', late);
+        }
+      }
+    }
+
+    function renderRows() {
+      const tbody = el('rows');
+      tbody.innerHTML = '';
+
+      state.rows.forEach((r) => {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-id', r.id);
+
+        tr.innerHTML = `
+          <td><input type="date" value="${escapeHtml(r.date)}" /></td>
+          <td><input value="${escapeHtml(r.firstName)}" placeholder="שם פרטי" /></td>
+          <td><input value="${escapeHtml(r.lastName)}" placeholder="שם משפחה" /></td>
+          <td><input data-role="arrival" value="${escapeHtml(r.arrival)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input value="${escapeHtml(r.shiftStart)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input class="cellInput" data-role="minPerHour" value="" inputmode="numeric" placeholder="ברירת מחדל" /></td>
+          <td class="num" data-col="hours">0.00</td>
+          <td class="num" data-col="minTotal">0.00</td>
+          <td class="num" data-col="tipsFromPool">0.00</td>
+          <td class="num" data-col="employerTopup">0.00</td>
+          <td class="num" data-col="totalPay">0.00</td>
+          <td>
+            <div class="rowControls">
+              <button class="btn mini danger" type="button">מחק</button>
+            </div>
+          </td>
+        `;
+
+        const inputs = tr.querySelectorAll('input');
+        // mapping: 0=date,1=firstName,2=lastName,3=arrival,4=shiftStart,5=shiftEnd,6=minPerHour
+        inputs[0].addEventListener('input', (e)=>updateRow(r.id,'date', e.target.value));
+        inputs[1].addEventListener('input', (e)=>updateRow(r.id,'firstName', e.target.value));
+        inputs[2].addEventListener('input', (e)=>updateRow(r.id,'lastName', e.target.value));
+
+        // Arrival (auto ":" while typing + normalize on blur)
+        inputs[3].addEventListener('input', (e) => {
+          const v = autoColonWhileTyping(e.target.value);
+          if (e.target.value !== v) e.target.value = v;
+          updateRow(r.id, 'arrival', e.target.value);
+        });
+        inputs[3].addEventListener('blur', (e) => {
+          const v = normalizeOnBlurToHHMM(e.target.value);
+          if (v) e.target.value = v;
+          updateRow(r.id, 'arrival', e.target.value);
+        });
+
+        // Shift Start
+        inputs[4].addEventListener('input', (e) => {
+          const v = autoColonWhileTyping(e.target.value);
+          if (e.target.value !== v) e.target.value = v;
+          updateRow(r.id, 'shiftStart', e.target.value);
+        });
+        inputs[4].addEventListener('blur', (e) => {
+          const v = normalizeOnBlurToHHMM(e.target.value);
+          if (v) e.target.value = v;
+          updateRow(r.id, 'shiftStart', e.target.value);
+        });
+
+        // Shift End
+        inputs[5].addEventListener('input', (e) => {
+          const v = autoColonWhileTyping(e.target.value);
+          if (e.target.value !== v) e.target.value = v;
+          updateRow(r.id, 'shiftEnd', e.target.value);
+        });
+        inputs[5].addEventListener('blur', (e) => {
+          const v = normalizeOnBlurToHHMM(e.target.value);
+          if (v) e.target.value = v;
+          updateRow(r.id, 'shiftEnd', e.target.value);
+        });
+
+        // Per-employee min per hour override (INTEGER ONLY):
+        // empty => null (use global), integer => override
+        inputs[6].addEventListener('input', (e) => {
+          const clean = digitsOnly(e.target.value);
+          if (e.target.value !== clean) e.target.value = clean;
+
+          const raw = clean.trim();
+          if (raw === '') {
+            updateRow(r.id, 'minPerHourOverride', null);
+            return;
+          }
+
+          const n = parseIntOrNull(raw);
+          if (n == null) return;
+          updateRow(r.id, 'minPerHourOverride', Math.max(0, n));
+        });
+
+        inputs[6].addEventListener('blur', (e) => {
+          const clean = digitsOnly(e.target.value);
+          if (e.target.value !== clean) e.target.value = clean;
+
+          const raw = clean.trim();
+          if (raw === '') {
+            updateRow(r.id, 'minPerHourOverride', null);
+            return;
+          }
+
+          const n = parseIntOrNull(raw);
+          if (n == null) {
+            recalc(); // revert display from state
+            return;
+          }
+
+          updateRow(r.id, 'minPerHourOverride', Math.max(0, n));
+        });
+
+        tr.querySelector('button').addEventListener('click', ()=>removeRow(r.id));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportToExcel() {
+      const alloc = computeAndAllocate();
+
+      const data = [];
+      data.push([
+        'Date',
+        'First Name',
+        'Last Name',
+        'Arrival',
+        'Shift Start',
+        'Shift End',
+        'Min Per Hour (Override or blank)',
+        'Total Hours',
+        'Min Total Pay',
+        'Tips From Pool',
+        'Employer Topup',
+        'Total Pay'
+      ]);
+
+      for (let i=0;i<state.rows.length;i++){
+        const r = state.rows[i];
+        const rd = alloc.rowsData[i];
+
+        const tipsC = alloc.tipsAllocCents[i] || 0;
+        const topupC = alloc.employerTopupCents[i] || 0;
+        const totalPayC = tipsC + topupC;
+
+        data.push([
+          r.date,
+          r.firstName,
+          r.lastName,
+          r.arrival,
+          r.shiftStart,
+          r.shiftEnd,
+          (r.minPerHourOverride == null ? '' : Number(r.minPerHourOverride)),
+          Number(rd.hours.toFixed(2)),
+          Number(centsToMoney(rd.minTotalCents).toFixed(2)),
+          Number(centsToMoney(tipsC).toFixed(2)),
+          Number(centsToMoney(topupC).toFixed(2)),
+          Number(centsToMoney(totalPayC).toFixed(2))
+        ]);
+      }
+
+      data.push([]);
+      data.push(['TOTAL TIPS', Number(centsToMoney(alloc.totalTipsCents).toFixed(2))]);
+      data.push(['TOTAL HOURS', Number(alloc.totalHours.toFixed(2))]);
+      data.push(['DEFAULT MIN PER HOUR', Number(centsToMoney(alloc.globalRateCentsPerHour).toFixed(2))]);
+      data.push(['SUM MIN TOTAL', Number(centsToMoney(alloc.sumMinCents).toFixed(2))]);
+      const topupSum = alloc.employerTopupCents.reduce((a,b)=>a+b,0);
+      data.push(['EMPLOYER TOPUP TOTAL', Number(centsToMoney(topupSum).toFixed(2))]);
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // Color "Arrival" cell red when gap > 60 minutes (Excel)
+      // Arrival column index: 3 (0-based). Data rows start at excel row 2 (1-based)
+      for (let i = 0; i < state.rows.length; i++) {
+        const r = state.rows[i];
+        const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
+        if (gap != null && gap > 60) {
+          const excelRow = 2 + i;
+          const cellAddress = XLSX.utils.encode_cell({ c: 3, r: excelRow - 1 });
+          if (!ws[cellAddress]) continue;
+
+          ws[cellAddress].s = ws[cellAddress].s || {};
+          ws[cellAddress].s.fill = { patternType: "solid", fgColor: { rgb: "FFEF4444" } };
+          ws[cellAddress].s.font = ws[cellAddress].s.font || {};
+          ws[cellAddress].s.font.color = { rgb: "FFFFFFFF" };
+        }
+      }
+
+      // Highlight per-employee manual min cells (col=6)
+      for (let i = 0; i < state.rows.length; i++) {
+        const r = state.rows[i];
+        if (r.minPerHourOverride == null) continue;
+        const excelRow = 2 + i;
+        const cellAddress = XLSX.utils.encode_cell({ c: 6, r: excelRow - 1 });
+        if (!ws[cellAddress]) continue;
+
+        ws[cellAddress].s = ws[cellAddress].s || {};
+        ws[cellAddress].s.fill = { patternType: "solid", fgColor: { rgb: "FF7C5CFF" } };
+        ws[cellAddress].s.font = ws[cellAddress].s.font || {};
+        ws[cellAddress].s.font.color = { rgb: "FFFFFFFF" };
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'TipSplit');
+
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+
+      XLSX.writeFile(wb, `tips_${yyyy}-${mm}-${dd}.xlsx`, { bookType: "xlsx", cellStyles: true });
+    }
+
+    function importFromExcel(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+        if (!rows || rows.length < 2) {
+          alert('הקובץ ריק או לא תקין.');
+          return;
+        }
+
+        const imported = [];
+        for (let i=1;i<rows.length;i++){
+          const r = rows[i];
+          if (!r || r.length === 0) break;
+
+          const firstCell = String(r[0] ?? '').trim();
+          if (!firstCell) break;
+
+          const k = String(r[0] ?? '').trim().toUpperCase();
+          if (k === 'TOTAL TIPS') break;
+
+          const minOverrideCell = (r.length > 6) ? r[6] : null;
+          const minOverrideNum = parseNumberOrNull(minOverrideCell);
+          const minOverride = (minOverrideNum == null) ? null : Math.max(0, Math.round(minOverrideNum)); // keep integer
+
+          imported.push({
+            date: String(r[0] ?? ''),
+            firstName: String(r[1] ?? ''),
+            lastName: String(r[2] ?? ''),
+            arrival: String(r[3] ?? ''),
+            shiftStart: String(r[4] ?? ''),
+            shiftEnd: String(r[5] ?? ''),
+            minPerHourOverride: minOverride
+          });
+        }
+
+        let totalTips = 0;
+        let defaultMin = 0;
+
+        for (let i=0;i<rows.length;i++){
+          const r = rows[i];
+          if (!r || r.length < 2) continue;
+          const k = String(r[0] ?? '').trim().toUpperCase();
+          if (k === 'TOTAL TIPS') totalTips = parseNumber(r[1]);
+          if (k === 'DEFAULT MIN PER HOUR') defaultMin = parseNumber(r[1]);
+          // Backward compat:
+          if (k === 'MIN PER HOUR') defaultMin = parseNumber(r[1]);
+        }
+
+        state.rows = [];
+        imported.forEach(x => addRow(x));
+
+        if (Number.isFinite(totalTips) && totalTips > 0) el('totalTips').value = String(totalTips);
+        if (Number.isFinite(defaultMin) && defaultMin > 0) el('minPerHour').value = String(defaultMin);
+
+        renderRows();
+        recalc();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Service Worker for PWA install
+    (function registerSW(){
+      if (!('serviceWorker' in navigator)) return;
+      window.addEventListener('load', async () => {
+        try { await navigator.serviceWorker.register('./sw.js', { scope: './' }); } catch (e) {}
+      });
+    })();
+
+    // PWA Install button (Android/Chrome)
+    (function installPromptButton(){
+      const btn = el('installBtn');
+      if (!btn) return;
+
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      if (isStandalone) { btn.style.display = 'none'; return; }
+
+      let deferredPrompt = null;
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        btn.style.display = 'inline-flex';
+      });
+
+      btn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        btn.style.display = 'none';
+        deferredPrompt.prompt();
+        try { await deferredPrompt.userChoice; } catch (e) {}
+        deferredPrompt = null;
+      });
+
+      window.addEventListener('appinstalled', () => {
+        btn.style.display = 'none';
+        deferredPrompt = null;
+      });
+    })();
+
+    // Events
+    el('addRowBtn').addEventListener('click', () => addRow());
+    el('totalTips').addEventListener('input', recalc);
+    el('minPerHour').addEventListener('input', recalc);
+
+    el('exportBtn').addEventListener('click', () => {
+      if (state.rows.length === 0) {
+        alert('אין עובדים לייצוא. הוסף לפחות עובד אחד.');
+        return;
+      }
+      exportToExcel();
+    });
+
+    el('importBtn').addEventListener('click', () => el('filePicker').click());
+    el('filePicker').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      importFromExcel(f);
+      e.target.value = '';
+    });
+
+    // Init
+    setToday();
+    addRow();
+  </script>
+</body>
+</html>
