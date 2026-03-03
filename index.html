@@ -629,22 +629,14 @@
           employerTopupCents[i] = rowsData[i].minTotalCents;
         }
       } else if (totalTipsCents >= sumMinCents) {
-        // Case A: enough tips to cover all minima
-        for (let i=0;i<rowsData.length;i++){
-          tipsAllocCents[i] = rowsData[i].minTotalCents;
-        }
-        const remaining = totalTipsCents - sumMinCents;
-
-        if (remaining > 0) {
-          const weights = rowsData.map(x => x.minutes);
-          const extra = largestRemainderAllocate(remaining, weights);
-          for (let i=0;i<rowsData.length;i++){
-            tipsAllocCents[i] += extra[i];
-          }
-        }
+        // Case A (FAIR): split ALL tips purely by minutes (same tips/hour for everyone)
+        const weights = rowsData.map(x => x.minutes);
+        const alloc = largestRemainderAllocate(totalTipsCents, weights);
 
         for (let i=0;i<rowsData.length;i++){
-          employerTopupCents[i] = 0;
+          tipsAllocCents[i] = alloc[i];
+          // employer tops up to each employee's required minimum (including overrides)
+          employerTopupCents[i] = Math.max(0, rowsData[i].minTotalCents - tipsAllocCents[i]);
         }
       } else {
         // Case B: not enough tips -> distribute tips proportionally to required minima
